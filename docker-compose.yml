@@ -1,0 +1,70 @@
+x-mongo-common-env: &mongo-common-env
+  MONGO_ROOT_USER: "${MONGO_ROOT_USER}"
+  MONGO_ROOT_PASSWORD: "${MONGO_ROOT_PASSWORD}"
+  MONGO_USER: "${MONGO_USER}"
+  MONGO_PASSWORD: "${MONGO_PASSWORD}"
+  MONGO_DB: "${MONGO_DB}"
+
+services:
+  mongodb:
+    image: mongo:8.0.5
+    container_name: mongodb
+    restart: always
+    environment:
+      <<: *mongo-common-env
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_ROOT_USER}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_ROOT_PASSWORD}"
+      MONGODB_ATLAS_TELEMETRY_ENABLE: 'false'
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: mongosh --eval 'db.adminCommand("ping").ok' --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  mongo-express:
+    image: mongo-express:1.0.2-20
+    container_name: mongo-express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *mongo-common-env
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "${MONGO_ROOT_USER}"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "${MONGO_ROOT_PASSWORD}"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_ROOT_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  db-init:
+    build: ./infra/db_init
+    container_name: db-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGO_URI: "mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin"
+    volumes:
+      - ./code/db_init:/app/src
+
+  data-generator:
+    build: ./infra/datagen
+    container_name: data-generator
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      MONGO_URI: "mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin"
+    volumes:
+      - ./code/datagen:/app/src
+
+volumes:
+  mongodb_data:
+    name: mongodb_data
