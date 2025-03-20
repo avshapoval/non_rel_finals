@@ -5,31 +5,16 @@ import logging
 
 import pymongo
 
-# Настройка логгера
+
 def setup_logger():
     logger = logging.getLogger('init_db')
     logger.setLevel(logging.INFO)
     
-    # Создаем обработчик для вывода в консоль
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    
-    # Создаем форматтер для обработчика
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    
-    # Добавляем обработчик к логгеру
-    logger.addHandler(console_handler)
-    
     return logger
 
-# Инициализация логгера
-logger = setup_logger()
-
 def create_collections_with_schemas(db):
-    logger.info("Создание коллекций со схемами валидации...")
     
-    # Коллекция студентов
+    # Студенты
     db.create_collection('students', validator={
         '$jsonSchema': {
             'bsonType': 'object',
@@ -84,7 +69,7 @@ def create_collections_with_schemas(db):
         }
     })
     
-    # Коллекция курсов
+    # Курсы
     db.create_collection('courses', validator={
         '$jsonSchema': {
             'bsonType': 'object',
@@ -121,7 +106,7 @@ def create_collections_with_schemas(db):
         }
     })
     
-    # Коллекция преподавателей
+    # Преподаватели
     db.create_collection('professors', validator={
         '$jsonSchema': {
             'bsonType': 'object',
@@ -165,7 +150,7 @@ def create_collections_with_schemas(db):
         }
     })
     
-    # Коллекция оценок
+    # Оценки
     db.create_collection('grades', validator={
         '$jsonSchema': {
             'bsonType': 'object',
@@ -210,7 +195,7 @@ def create_collections_with_schemas(db):
         }
     })
     
-    # Коллекция факультетов
+    # Факультеты
     db.create_collection('faculties', validator={
         '$jsonSchema': {
             'bsonType': 'object',
@@ -244,41 +229,35 @@ def create_collections_with_schemas(db):
     })
 
 def create_indexes(db):
-    logger.info("Создание индексов...")
     
-    # Индексы для коллекции студентов
     db.students.create_index([("studentId", pymongo.ASCENDING)], unique=True)
     db.students.create_index([("email", pymongo.ASCENDING)], unique=True)
     db.students.create_index([("faculty", pymongo.ASCENDING)])
     db.students.create_index([("lastName", pymongo.ASCENDING), ("firstName", pymongo.ASCENDING)])
     
-    # Индексы для коллекции курсов
     db.courses.create_index([("courseId", pymongo.ASCENDING)], unique=True)
     db.courses.create_index([("faculty", pymongo.ASCENDING)])
     db.courses.create_index([("name", pymongo.ASCENDING)])
     
-    # Индексы для коллекции преподавателей
     db.professors.create_index([("professorId", pymongo.ASCENDING)], unique=True)
     db.professors.create_index([("email", pymongo.ASCENDING)], unique=True)
     db.professors.create_index([("faculty", pymongo.ASCENDING)])
     db.professors.create_index([("lastName", pymongo.ASCENDING), ("firstName", pymongo.ASCENDING)])
     
-    # Индексы для коллекции оценок
     db.grades.create_index([
         ("studentId", pymongo.ASCENDING), 
         ("courseId", pymongo.ASCENDING), 
         ("semester", pymongo.ASCENDING), 
         ("academicYear", pymongo.ASCENDING)
     ], unique=True)
+
     db.grades.create_index([("courseId", pymongo.ASCENDING)])
     db.grades.create_index([("professorId", pymongo.ASCENDING)])
     db.grades.create_index([("academicYear", pymongo.ASCENDING), ("semester", pymongo.ASCENDING)])
     
-    # Индексы для коллекции факультетов
     db.faculties.create_index([("name", pymongo.ASCENDING)], unique=True)
 
 def drop_existing_collections(db):
-    logger.info("Удаление существующих коллекций...")
     collections = db.list_collection_names()
     for collection in collections:
         db.drop_collection(collection)
@@ -301,22 +280,17 @@ def main():
         logger.info(f"Попытка подключения к MongoDB (попытка {attempt + 1}/{max_retries})...")
 
         client = pymongo.MongoClient(mongo_uri)
-        # Проверка соединения
+
         client.admin.command('ping')
         logger.info("Успешное подключение к MongoDB.")
         
-        # Определяем имя БД из URI
         db_name = mongo_uri.split('/')[-1].split('?')[0]
-        # Инициализация базы данных
         db = client[db_name]
         
-        # Удаление существующих коллекций
         drop_existing_collections(db)
         
-        # Создание коллекций со схемами
         create_collections_with_schemas(db)
         
-        # Создание индексов
         create_indexes(db)
         
         logger.info("Инициализация базы данных завершена успешно!")
